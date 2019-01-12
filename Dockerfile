@@ -1,4 +1,4 @@
-FROM geerlingguy/docker-debian9-ansible:latest
+FROM dankempster/raspbian-stretch-ansible:latest
 LABEL maintainer="Dan Kempster"
 
 ENV DEBIAN_FRONTEND noninteractive
