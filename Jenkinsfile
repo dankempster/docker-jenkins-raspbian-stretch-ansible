@@ -6,7 +6,7 @@ def IMAGE_TAG = "build"
 pipeline {
 
   agent {
-    label 'amd64'
+    label 'raspberrypi'
   }
 
   stages {
