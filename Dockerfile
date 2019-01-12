@@ -6,15 +6,15 @@ ENV DEBIAN_FRONTEND noninteractive
 # Install dependencies.
 # RUN mkdir -p /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm
 # RUN ln -s /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/client /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/server
-RUN apt-get update
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
        software-properties-common \
        curl \
        dirmngr \
        gnupg \
        apt-transport-https \
-       openjdk-8-jdk
-RUN rm -rf /var/lib/apt/lists/* \
+       openjdk-8-jdk \
+    && rm -rf /var/lib/apt/lists/* \
     && rm -Rf /usr/share/doc && rm -Rf /usr/share/man \
     && apt-get clean
 
