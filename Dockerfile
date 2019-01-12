@@ -21,7 +21,8 @@ RUN rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # Install Jenkins
-RUN apt-key adv --fetch-keys https://pkg.jenkins.io/debian/jenkins.io.apt-key \
+
+RUN apt-key adv --fetch-keys https://pkg.jenkins.io/debian/jenkins.io.key \
     && add-apt-repository -y 'deb https://pkg.jenkins.io/debian binary/' \
     && apt-get update \
     && apt-get install -y --allow-unauthenticated --no-install-recommends jenkins \
