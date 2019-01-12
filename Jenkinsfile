@@ -12,6 +12,19 @@ pipeline {
 
   stages {
 
+    stage('Tags') {
+      steps {
+        script {
+          TAGS = sh(
+            script: "git tag -l --points-at HEAD",
+            returnStdout: true
+          ).trim()
+        }
+
+        echo "${TAGS}"
+      }
+    }
+
     stage('Build') {
       steps {
         
@@ -125,6 +138,15 @@ pipeline {
         withDockerRegistry([credentialsId: "com.docker.hub.dankempster", url: ""]) {
           sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
         }
+
+        script {
+          TAGS = sh(
+            script: "git tag -l --points-at HEAD",
+            returnStdout: true
+          ).trim()
+        }
+
+        echo "${TAGS}"
       }
     }
   }
