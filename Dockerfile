@@ -3,8 +3,6 @@ LABEL maintainer="Dan Kempster"
 
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV pip_packages "ansible"
-
 # Install dependencies.
 # RUN mkdir -p /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm
 # RUN ln -s /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/client /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/server
