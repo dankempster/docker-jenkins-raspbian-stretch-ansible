@@ -1,7 +1,7 @@
 #!/usr/bin/env groovy
 
 def GOSS_RELEASE = "v0.3.6"
-def IMAGE_NAME = "dankempster/jenkins-ansible"
+def IMAGE_NAME = "dankempster/jenkins-raspbian-stretch-ansible"
 def IMAGE_TAG = "build"
 
 pipeline {
