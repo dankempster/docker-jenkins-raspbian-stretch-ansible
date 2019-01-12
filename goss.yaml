@@ -1,0 +1,33 @@
+file:
+  /var/lib/jenkins:
+    exists: true
+    mode: "0755"
+    size: 4096
+    owner: jenkins
+    group: jenkins
+    filetype: directory
+    contains: []
+package:
+  jenkins:
+    installed: true
+    versions:
+    - "2.156"
+port:
+  tcp:8080:
+    listening: false
+    ip: []
+  tcp:50000:
+    listening: false
+    ip: []
+process:
+  jenkins:
+    running: true
+user:
+  jenkins:
+    exists: true
+    uid: 105
+    gid: 106
+    groups:
+    - jenkins
+    home: /var/lib/jenkins
+    shell: /bin/bash
