@@ -1,5 +1,6 @@
 #!/usr/bin/env groovy
 
+def GOSS_RELEASE = "v0.3.6"
 def IMAGE_NAME = "dankempster/jenkins-ansible"
 def IMAGE_TAG = "build"
 
@@ -11,20 +12,13 @@ pipeline {
 
   stages {
 
-    stage('Prepare') {
-      steps {
-        sh '''
-          docker pull $(head -n 1 Dockerfile | cut -d " " -f 2)
-
-          [ -d bin ] || mkdir bin
-
-          curl -fsSL https://goss.rocks/install | GOSS_DST=./bin sh
-        '''
-      }
-    }
-
     stage('Build') {
       steps {
+        
+        // Ensure we have the latest base docker image
+        sh "docker pull \$(head -n 1 Dockerfile | cut -d \" \" -f 2)"
+
+        // Work out the correct tag to use
         script { 
           if (env.BRANCH_NAME == 'develop') {
             IMAGE_TAG = 'develop'
@@ -32,16 +26,30 @@ pipeline {
           else if (env.BRANCH_NAME == 'master') {
             IMAGE_TAG = 'latest'
           }
+          else {
+            IMAGE_TAG = 'build'
+          }
         }
         
+        // Build the image
         sh "docker build -f Dockerfile -t ${IMAGE_NAME}:${IMAGE_TAG} ."
       }
     }
 
     stage('Tests') {
       steps {
+        sh '[ -d bin ] || mkdir bin'
         sh '[ -d build/reports ] || mkdir -p build/reports'
 
+        // See https://github.com/aelsabbahy/goss/releases for release versions
+        sh "curl -L https://github.com/aelsabbahy/goss/releases/download/${GOSS_RELEASE}/goss-linux-arm -o ./bin/goss"
+
+        // dgoss docker wrapper (use 'master' for latest version)
+        sh "curl -L https://raw.githubusercontent.com/aelsabbahy/goss/${GOSS_RELEASE}/extras/dgoss/dgoss -o ./bin/dgoss"
+        
+        sh "chmod +rx ./bin/{goss,dgoss}"
+
+        // Run the tests  
         sh """
           export GOSS_PATH=\$(pwd)/bin/goss
           export GOSS_OPTS="--format junit"
