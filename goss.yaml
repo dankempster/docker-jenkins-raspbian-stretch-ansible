@@ -10,8 +10,6 @@ file:
 package:
   jenkins:
     installed: true
-    versions:
-    - "2.156"
 port:
   tcp:8080:
     listening: false
@@ -25,8 +23,6 @@ process:
 user:
   jenkins:
     exists: true
-    uid: 105
-    gid: 106
     groups:
     - jenkins
     home: /var/lib/jenkins

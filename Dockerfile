@@ -1,14 +1,12 @@
-FROM geerlingguy/docker-debian9-ansible:latest
+FROM dankempster/raspbian-stretch-ansible:0.1
 LABEL maintainer="Dan Kempster"
 
 ENV DEBIAN_FRONTEND noninteractive
 
-ENV pip_packages "ansible"
-
 # Install dependencies.
-RUN mkdir -p /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm \
-	&& ln -s /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/client /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/server \
-    && apt-get update \
+# RUN mkdir -p /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm
+# RUN ln -s /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/client /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm/server
+RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        software-properties-common \
        curl \
@@ -21,10 +19,10 @@ RUN mkdir -p /usr/lib/jvm/java-8-openjdk-armhf/jre/lib/arm \
     && apt-get clean
 
 # Install Jenkins
-RUN apt-key adv --fetch-keys https://pkg.jenkins.io/debian/jenkins.io.apt-key \
-    && add-apt-repository -y 'deb https://pkg.jenkins.io/debian binary/' \
+RUN apt-key adv --fetch-keys https://pkg.jenkins.io/debian/jenkins.io.key \
+    && echo 'deb https://pkg.jenkins.io/debian binary/' > /etc/apt/sources.list.d/jenkins.list \
     && apt-get update \
-    && apt-get install -y --allow-unauthenticated --no-install-recommends jenkins \
+    && apt-get install -y --no-install-recommends jenkins \
     && rm -rf /var/lib/apt/lists/* \
     && rm -Rf /usr/share/doc && rm -Rf /usr/share/man \
     && apt-get clean \
