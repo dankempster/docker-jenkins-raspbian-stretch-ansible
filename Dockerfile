@@ -1,4 +1,4 @@
-FROM dankempster/raspbian-stretch-ansible:latest
+FROM dankempster/raspbian-stretch-ansible:0.1
 LABEL maintainer="Dan Kempster"
 
 ENV DEBIAN_FRONTEND noninteractive
