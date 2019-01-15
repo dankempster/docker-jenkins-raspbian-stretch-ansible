@@ -1,25 +1,37 @@
+command:
+  ansible --version:
+    exit-status: 0
 file:
   /var/lib/jenkins:
     exists: true
     mode: "0755"
-    size: 4096
     owner: jenkins
     group: jenkins
     filetype: directory
-    contains: []
+  /etc/default/locale:
+    exists: true
+    owner: root
+    group: root
+    contains:
+      - "LANG=en_GB.UTF-8"
+  /etc/default/jenkins:
+    exists: true
+    owner: root
+    group: root
+    contains:
+      - "JAVA_ARGS=\"-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false\""
+  /etc/systemd/system/multi-user.target.wants/jenkins.service:
+    exists: true
+    owner: root
+    group: root
+    filetype: file
 package:
   jenkins:
     installed: true
 port:
   tcp:8080:
-    listening: false
+    listening: true
     ip: []
-  tcp:50000:
-    listening: false
-    ip: []
-process:
-  jenkins:
-    running: true
 user:
   jenkins:
     exists: true
@@ -27,3 +39,11 @@ user:
     - jenkins
     home: /var/lib/jenkins
     shell: /bin/bash
+http:
+  "http://localhost:8080/cli/":
+    # required attributes
+    status: 200
+    # optional attributes
+    allow-insecure: true
+    no-follow-redirects: false
+    timeout: 1000
