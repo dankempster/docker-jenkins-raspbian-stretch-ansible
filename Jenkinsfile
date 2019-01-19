@@ -113,7 +113,10 @@ pipeline {
       when {
         anyOf {
           branch 'develop'
-          anyOf {
+          allOf {
+            expression {
+              currentBuild.result != 'UNSTABLE'
+            }
             branch 'master'
           }
         }
