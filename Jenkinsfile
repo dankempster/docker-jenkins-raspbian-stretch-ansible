@@ -155,17 +155,14 @@ pipeline {
     }
 
     stage('Release') {
-      // when {
-      //   anyOf {
-      //     branch 'develop'
-      //     allOf {
-      //       expression {
-      //         currentBuild.result != 'UNSTABLE'
-      //       }
-      //       branch 'master'
-      //     }
-      //   }
-      // }
+      when {
+        allOf {
+          expression {
+            currentBuild.result != 'UNSTABLE'
+          }
+          branch 'master'
+        }
+      }
       steps {
         script {
           GIT_TAG = sh(
