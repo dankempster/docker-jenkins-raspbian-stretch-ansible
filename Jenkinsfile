@@ -135,18 +135,54 @@ pipeline {
         }
       }
       steps {
-        withDockerRegistry([credentialsId: "com.docker.hub.dankempster", url: ""]) {
-          sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
-        }
-
         script {
-          TAGS = sh(
+          GIT_TAG = sh(
             script: "git tag -l --points-at HEAD",
             returnStdout: true
           ).trim()
         }
 
-        echo "${TAGS}"
+        echo "${GIT_TAG}"
+
+        sh "[ ! -z \"$GIT_TAG\" ] && docker build -t ${IMAGE_NAME}:${GIT_TAG} . "
+
+        withDockerRegistry([credentialsId: "com.docker.hub.dankempster", url: ""]) {
+          sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+
+          sh "[ ! -z \"$GIT_TAG\" ] && docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+        }
+      }
+    }
+
+    stage('Release') {
+      // when {
+      //   anyOf {
+      //     branch 'develop'
+      //     allOf {
+      //       expression {
+      //         currentBuild.result != 'UNSTABLE'
+      //       }
+      //       branch 'master'
+      //     }
+      //   }
+      // }
+      steps {
+        script {
+          GIT_TAG = sh(
+            script: "git tag -l --points-at HEAD",
+            returnStdout: true
+          ).trim()
+        }
+
+        withDockerRegistry([credentialsId: "com.docker.hub.dankempster", url: ""]) {
+          sh """
+            if [ "${GIT_TAG}" != "" ]; then
+              docker build -t ${IMAGE_NAME}:${GIT_TAG} .
+
+              docker push ${IMAGE_NAME}:${GIT_TAG}
+            fi
+          """
+        }
       }
     }
   }
