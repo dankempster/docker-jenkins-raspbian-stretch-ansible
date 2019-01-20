@@ -10,6 +10,10 @@ pipeline {
     label 'raspberrypi'
   }
 
+  triggers {
+    upstream "/docker-images/ansible-testing/raspbian-stretch-ansible/" + env.BRANCH_NAME.replaceAll("/", "%2F")
+  }
+
   stages {
 
     stage('Build') {
