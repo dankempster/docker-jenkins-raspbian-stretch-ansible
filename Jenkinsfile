@@ -13,6 +13,8 @@ pipeline {
   stages {
 
     stage('Tags') {
+      sh "git fetch --tags"
+
       steps {
         script {
           TAGS = sh(
