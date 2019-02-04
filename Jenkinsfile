@@ -37,48 +37,92 @@ pipeline {
     }
 
     stage('Tests') {
-      steps {
-        sh '[ -d bin ] || mkdir bin'
-        sh '[ -d build/reports ] || mkdir -p build/reports'
+      parallel {
+        stage('Goss') {
+          steps {
 
-        // See https://github.com/aelsabbahy/goss/releases for release versions
-        sh "curl -L https://github.com/aelsabbahy/goss/releases/download/${GOSS_RELEASE}/goss-linux-arm -o ./bin/goss"
+            // Prepare build directory
+            sh 'rm -fr build/*'
+            sh '[ -d build/reports ] || mkdir -p build/reports'
+            sh '[ -d build/raw-reports ] || mkdir -p build/raw-reports'
 
-        // dgoss docker wrapper (use 'master' for latest version)
-        sh "curl -L https://raw.githubusercontent.com/aelsabbahy/goss/${GOSS_RELEASE}/extras/dgoss/dgoss -o ./bin/dgoss"
-        
-        sh "chmod +rx ./bin/{goss,dgoss}"
+            // Install Goss & dgoss
+            sh '[ -d bin ] || mkdir bin'
+            // -- See https://github.com/aelsabbahy/goss/releases for release versions
+            sh "curl -L https://github.com/aelsabbahy/goss/releases/download/${GOSS_RELEASE}/goss-linux-arm -o ./bin/goss"
+            // -- dgoss docker wrapper (use 'master' for latest version)
+            sh "curl -L https://raw.githubusercontent.com/aelsabbahy/goss/${GOSS_RELEASE}/extras/dgoss/dgoss -o ./bin/dgoss"            
+            sh "chmod +rx ./bin/{goss,dgoss}"
 
-        // Run the tests  
-        sh """
-          export GOSS_PATH=\$(pwd)/bin/goss
-          export GOSS_OPTS="--format junit"
+            // Run the tests  
+            sh """
+              export GOSS_PATH=\$(pwd)/bin/goss
+              export GOSS_OPTS="--retry-timeout 180s --sleep 10s --format junit"
 
-          ./bin/dgoss run --privileged --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro ${IMAGE_NAME}:${IMAGE_TAG} | \\grep '<' > build/reports/goss-junit.xml
-        """
-      }
-      post {
-        always {
-          junit 'build/reports/**/*.xml'
+              ./bin/dgoss run --privileged --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro ${IMAGE_NAME}:${IMAGE_TAG} | \\grep '<' > build/raw-reports/goss-output.txt
+            """
+          }
+          post {
+            always {
+              // The following is required to extract the last junit report
+              // from Goss output.
+              // This is required because
+              //  - goss outputs the junit format to STDOUT, with other output.
+              //  - goss prints out junit for each "retry", so the final output
+              //      is multiple junit reports. One for each "try" during the
+              //      tests.
+              //  - I have to use the goss' retry feature so it "waits" for
+              //      Jenkins to load.
+              //
+              sh """
+                cd build/raw-reports
+
+                # split Goss output into multiple files numbered sequentially.
+                awk '
+                FNR==1 {
+                   path = namex = FILENAME;
+                   sub(/^.*\\//,   "", namex);
+                   sub(namex "\$", "", path );
+                   name = ext  = namex;
+                   sub(/\\.[^.]*\$/, "", name);
+                   sub("^" name,   "", ext );
+                }
+                /<\\?xml / {
+                   if (out) close(out);
+                   out = path name (++file) ext ;
+                   print "Spliting to " out " ...";
+                }
+                /<\\?xml /,/<\\/testsuite>/ {
+                   print \$0 > out
+                }
+                ' goss-output.txt
+
+                # use the highest numbered file as Goss' final junit report
+                mv goss-output\$(ls -l | grep -P goss-output[0-9]+\\.txt | wc -l).txt ../reports/goss-junit.xml
+              """
+
+              junit 'build/reports/**/*.xml'
+            }
+          }
         }
-      }
-    }
 
-    stage('Ansible Test') {
-      steps {
-        script {
-          CONTAINER_ID = sh(
-            script: "docker run --detach --privileged --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro ${IMAGE_NAME}:${IMAGE_TAG}",
-            returnStdout: true
-          ).trim()
+        stage('Ansible\'s Version') {
+          steps {
+            script {
+              CONTAINER_ID = sh(
+                script: "docker run --detach --privileged --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro ${IMAGE_NAME}:${IMAGE_TAG}",
+                returnStdout: true
+              ).trim()
+            }
+            
+            sh "docker exec --tty ${CONTAINER_ID} env TERM=xterm ansible --version"
+
+            sh """
+              docker stop ${CONTAINER_ID}
+              docker rm ${CONTAINER_ID}
+            """
+          }
         }
-        
-        sh "docker exec --tty ${CONTAINER_ID} env TERM=xterm ansible --version"
-
-        sh """
-          docker stop ${CONTAINER_ID}
-          docker rm ${CONTAINER_ID}
-        """
       }
     }
 
@@ -86,7 +130,10 @@ pipeline {
       when {
         anyOf {
           branch 'develop'
-          anyOf {
+          allOf {
+            expression {
+              currentBuild.result != 'UNSTABLE'
+            }
             branch 'master'
           }
         }

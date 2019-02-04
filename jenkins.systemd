@@ -1,0 +1,19 @@
+[Unit]
+Description=Jenkins - open source automation server
+Before=multi-user.target
+After=network-online.target
+
+[Service]
+ExecStart=/etc/init.d/jenkins start
+ExecStop=/etc/init.d/jenkins stop
+CapabilityBoundingSet=~CAP_SYS_PTRACE
+GuessMainPID=no
+IgnoreSIGPIPE=no
+KillMode=process
+LimitNOFILE=64000
+LimitNPROC=64000
+ProtectHome=true
+ProtectSystem=full
+RemainAfterExit=yes
+TimeoutSec=5min
+Type=oneshot
