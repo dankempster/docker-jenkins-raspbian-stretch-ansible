@@ -127,9 +127,9 @@ pipeline {
       }
     }
 
-    // stage('UATs') {
-    //   parallel {
-        stage('UAT: jenkins-config') {
+    stage('UATs') {
+      parallel {
+        stage('jenkins-config') {
           steps {
             sh '[ -d build/uats/jenkins-config ] || mkdir -p build/uats/jenkins-config'
 
@@ -182,8 +182,62 @@ pipeline {
             }
           }
         }
-    //   }
-    // }
+
+        stage('jenkins-farm') {
+          steps {
+            sh '[ -d build/uats/jenkins-farm ] || mkdir -p build/uats/jenkins-farm'
+
+            dir("build/uats/jenkins-farm") {
+              git(
+                branch: 'develop',
+                changelog: false,
+                credentialsId: 'com.github.dankempster.user',
+                poll: false,
+                url: 'https://github.com/dankempster/ansible-role-jenkins-farm.git'
+              )
+
+              ansiColor('xterm') {
+                sh "sed -i 's/^MOLECULE_IMAGE:.*/MOLECULE_IMAGE: ${SED_IMAGE_NAME}:${IMAGE_TAG}/g' ./molecule/raspbian_stretch_env.yml"
+
+                script {
+                  try {
+                    sh '''
+                      virtualenv virtenv
+                      source virtenv/bin/activate
+                      pip install --upgrade ansible molecule docker jmespath xmlunittest
+
+                      molecule -e ./molecule/raspbian_stretch_env.yml converge
+                      molecule -e ./molecule/raspbian_stretch_env.yml verify
+                    '''
+                  } catch (Exception e) {
+                    currentBuild.result = 'UNSTABLE'
+                  }
+                }
+              }
+            }
+          }
+          post {
+            always {
+              dir("build/uats/jenkins-farm") {
+                script {
+                  try {
+                    ansiColor('xterm') {
+                      sh '''
+                        virtualenv virtenv
+                        source virtenv/bin/activate
+
+                        molecule -e ./molecule/raspbian_stretch_env.yml destroy
+                      '''
+                    }
+                  } catch (Exception e) {
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
 
     stage('Publish') {
       when {
