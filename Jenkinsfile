@@ -2,6 +2,7 @@
 
 def GOSS_RELEASE = "v0.3.6"
 def IMAGE_NAME = "dankempster/jenkins-raspbian-stretch-ansible"
+def SED_IMAGE_NAME = "dankempster\\/jenkins-raspbian-stretch-ansible"
 def IMAGE_TAG = "build"
 
 pipeline {
@@ -125,6 +126,64 @@ pipeline {
         }
       }
     }
+
+    // stage('UATs') {
+    //   parallel {
+        stage('UAT: jenkins-config') {
+          steps {
+            sh '[ -d build/uats/jenkins-config ] || mkdir -p build/uats/jenkins-config'
+
+            dir("build/uats/jenkins-config") {
+              git(
+                branch: 'feature/install-git-by-default',
+                changelog: false,
+                credentialsId: 'com.github.dankempster.user',
+                poll: false,
+                url: 'https://github.com/dankempster/ansible-role-jenkins-config.git'
+              )
+
+              ansiColor('xterm') {
+                sh "sed -i 's/^MOLECULE_IMAGE:.*/MOLECULE_IMAGE: ${SED_IMAGE_NAME}:${IMAGE_TAG}/g' ./molecule/raspbian_stretch_env.yml"
+
+                script {
+                  try {
+                    sh '''
+                      virtualenv virtenv
+                      source virtenv/bin/activate
+                      pip install --upgrade ansible molecule docker jmespath xmlunittest
+
+                      molecule -e ./molecule/raspbian_stretch_env.yml converge
+                      molecule -e ./molecule/raspbian_stretch_env.yml verify
+                    '''
+                  } catch (Exception e) {
+                    currentBuild.result = 'UNSTABLE'
+                  }
+                }
+              }
+            }
+          }
+          post {
+            always {
+              dir("build/uats/jenkins-config") {
+                script {
+                  try {
+                    ansiColor('xterm') {
+                      sh '''
+                        virtualenv virtenv
+                        source virtenv/bin/activate
+
+                        molecule -e ./molecule/raspbian_stretch_env.yml destroy
+                      '''
+                    }
+                  } catch (Exception e) {
+                  }
+                }
+              }
+            }
+          }
+        }
+    //   }
+    // }
 
     stage('Publish') {
       when {
