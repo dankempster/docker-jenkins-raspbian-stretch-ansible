@@ -1,0 +1,245 @@
+<project name="ansible-jenkins-play" basedir=".">
+  <!-- Sets properties for macosx/windows/linux depending on current system -->
+  <condition property="macos">
+    <and>
+      <os family="mac" />
+      <not>
+        <os family="unix" />
+      </not>
+    </and>
+  </condition>
+  <condition property="linux_arm">
+    <and>
+      <os family="unix" />
+      <not>
+        <os family="mac"/>
+      </not>
+      <not>
+        <os arch="arm"/>
+      </not>
+    </and>
+  </condition>
+  <condition property="linux_arm">
+    <os family="unix" arch="arm" />
+  </condition>
+  <condition property="goss.pre_installed">
+    <and>
+      <resourceexists>
+        <file file="${dir.bin}/goss"/>
+      </resourceexists>
+      <resourceexists>
+        <file file="${dir.bin}/dgoss"/>
+      </resourceexists>
+    </and>
+  </condition>
+
+  <condition property="image.name" value="dankempster/jenkins-ansible" else="dankempster/jenkins-ansible-raspbian-stretch">
+    <os family="unix" arch="arm" />
+  </condition>
+  <condition property="image.name.sed" value="dankempster\/jenkins-ansible" else="dankempster\/jenkins-ansible-raspbian-stretch">
+    <os family="unix" arch="arm" />
+  </condition>
+
+  <!-- <condition property="linux32">
+    <os family="unix" arch="i386" />
+  </condition>
+  <condition property="linux64">
+    <os family="unix" arch="amd64" />
+  </condition> -->
+
+  <property name="distro" value="debian9" />
+
+  <property name="dir.bin" location="bin"/>
+  <property name="dir.reports" location="build/reports" />
+  <property name="dir.rawReports" location="build/raw-reports" />
+  <property name="dir.src" location="." />
+
+  <property name="goss.version" value="v0.3.6" />
+  <property name="goss.output" value="goss-output.txt" />
+  <property name="goss.opts" value="--retry-timeout 120s --sleep 5s" />
+
+  <property name="image.tag" value="build" />
+
+  <property name="docker.run.args" value="--privileged --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro -p 8080 -p 50000" />
+
+
+  <!-- ###############
+    == Build the image
+  -->
+  <target name="build" description="Build the docker image">
+    <exec executable="./build.sh">
+      <arg line="-r ${image.name}" />
+      <arg line="-t ${image.tag}" />
+    </exec>
+  </target>
+
+
+  <!-- #####################
+    == Clean build artifacts
+  -->
+  <target name="clean">
+    <delete dir="${dir.reports}" />
+    <delete dir="${dir.rawReports}" />
+  </target>
+
+
+  <!-- ##############
+    == Run Goss Tests
+  -->
+  <target name="-get-goss-path">
+    <condition property="bin.goss" value="${dir.bin}/goss" else="goss">
+      <resourceexists>
+        <file file="${dir.bin}/goss"/>
+      </resourceexists>
+    </condition>
+    <condition property="bin.dgoss" value="${dir.bin}/dgoss" else="dgoss">
+      <resourceexists>
+        <file file="${dir.bin}/dgoss"/>
+      </resourceexists>
+    </condition>
+    <echo>goss: ${bin.goss}</echo>
+    <echo>dgoss: ${bin.dgoss}</echo>
+  </target>
+
+  <target name="-prepare-directories">
+    <echo>Prepare report directories</echo>
+    <mkdir dir="bin" />
+    <mkdir dir="${dir.reports}" />
+    <mkdir dir="${dir.rawReports}" />
+  </target>
+
+  <!-- Run with default output -->
+  <target name="goss" depends="install-goss, -prepare-directories, -get-goss-path" description="Install Goss and run the Goss tests">
+    <echo>Running Goss tests...</echo>
+    <exec executable="bash">
+      <env key="GOSS_OPTS" value="${goss.opts}" />
+      <arg value="-c" />
+      <arg value="${bin.dgoss} run ${docker.run.args} ${image.name}:${image.tag}" />
+    </exec>
+  </target>
+
+  <!-- Run and output junit results -->
+  <target name="goss-junit" depends="install-goss, -prepare-directories, -get-goss-path">
+    <echo>Running Goss tests. This will take a while with no output...</echo>
+    <exec executable="bash">
+      <env key="GOSS_PATH" value="${bin.goss}" />
+      <env key="GOSS_OPTS" value="${goss.opts} --format junit" />
+      <arg value="-c" />
+      <arg value="${bin.dgoss} run ${docker.run.args} ${image.name}:${image.tag} | \grep '&lt;' &gt; ${dir.rawReports}/${goss.output}" />
+    </exec>
+
+    <echo>Extracting JUnit from Goss' output for Jenkins...</echo>
+    <exec executable="bash">
+      <arg value="-c" />
+      <arg value="${dir.bin}/process-goss-junit -g ${goss.output}" />
+    </exec>
+  </target>
+
+
+  <!-- ############
+    == Install Goss
+  -->
+  <target name="install-goss"
+    description="Install the Goss test tool"
+    depends="-install-goss-linux, -install-goss-arm, -install-goss-macos"
+    unless="${goss.pre_installed}"
+  />
+
+  <target name="-install-goss-linux" depends="-prepare-directories" if="${linux}">
+    <exec executable="bash">
+      <arg value="-c" />
+      <arg value="curl -fsSL https://goss.rocks/install | GOSS_DST=${dir.bin} sh" />
+    </exec>
+    <antcall target="-post-install-goss" />
+  </target>
+  
+  <!-- Install Goss on Linux ARM -->
+  <target name="-install-goss-arm" depends="-prepare-directories" if="${linux_arm}">
+    <exec executable="curl">
+      <arg value="-L" />
+      <arg value="https://github.com/aelsabbahy/goss/releases/download/${goss.version}/goss-linux-arm" />
+      <arg line="-o ./bin/goss" />
+    </exec>
+    <exec executable="curl">
+      <arg value="-L" />
+      <arg value="https://github.com/aelsabbahy/goss/releases/download/${goss.version}/dgoss" />
+      <arg line="-o ./bin/dgoss" />
+    </exec>
+    <antcall target="-post-install-goss" />
+  </target>
+  
+  <target name="-install-goss-macos" depends="-prepare-directories" if="${macos}">
+    <!-- Don't do anything (anymore), for now -->
+  </target>
+
+  <target name="-post-install-goss">
+    <exec executable="chmod">
+      <arg value="+rx" />
+      <arg value="${dir.bin}/goss" />
+    </exec>
+    <exec executable="chmod">
+      <arg value="+rx" />
+      <arg value="${dir.bin}/dgoss" />
+    </exec>
+  </target>
+
+
+
+  <!-- <target name="lint" depends="virtenv">
+  </target> -->
+  
+
+  <!-- ##############
+    == Reset to clean
+  -->
+  <target name="reset" description="Reset everything for a clean run next time.">
+    <antcall target="clean" />
+    <delete dir="bin/goss" />
+    <delete dir="bin/dgoss" />
+    <delete dir="virtenv" />
+  </target>
+  
+
+  <!-- ###################
+    == Run the built image
+  -->
+  <target name="run" description="Run the last build image">
+    <exec executable="docker">
+      <arg value="run" />
+      <arg value="-d" />
+      <arg line="${docker.run.args}" />
+      <arg value="${image.name}:${image.tag}" />
+    </exec>
+  </target>
+  
+
+  <!-- ##############
+    == Run tests
+  -->
+  <target name="test" depends="build,verify" description="Build &amp; Test" />
+
+
+  <!-- ##########################
+    == Run tests without building
+  -->
+  <target name="verify" depends="goss" description="Run the tests on existing image" />
+
+
+  <!-- ##########################
+    == Set up a python VirtualEnv
+  -->
+  <target name="virtenv">
+    <exec executable="virtualenv">
+      <arg value="virtenv" />
+    </exec>
+    <exec executable="virtenv/bin/pip">
+      <arg value="install" />
+      <arg value="--upgrade" />
+      <arg value="ansible" />
+      <arg value="molecule" />
+      <arg value="docker" />
+      <arg value="jmespath" />
+      <arg value="xmlunittest" />
+    </exec>
+  </target>
+</project>

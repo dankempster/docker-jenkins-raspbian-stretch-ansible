@@ -1,0 +1,96 @@
+#!/bin/bash
+
+# set -x
+
+PROGNAME=$(basename $0)
+
+gossOutputFile="goss-output.txt"
+reportsDir="build/reports"
+rawReportsDir="build/raw-reports"
+
+usage() {
+    echo "USAGE: ${PROGNAME} [-d DEST] [-w WORKDIR] -g FILE"
+    echo ""
+}
+
+errorExit() {
+#	----------------------------------------------------------------
+#	Function for exit due to fatal program error
+#		Accepts 1 argument:
+#			string : descriptive error message
+#	----------------------------------------------------------------
+#
+#   Example call of the error_exit function.  Note the inclusion
+#   of the LINENO environment variable.  It contains the current
+#   line number.
+#
+#	   error_exit "$LINENO: An error has occurred."
+#
+    echo "${PROGNAME}: ${1:-"Unknown Error"}" 1>&2
+    exit 2
+}
+
+usageErrorExit() {
+    echo "${PROGNAME}: ${1}" 1>&2
+    echo ""
+    usage
+    exit 1
+}
+
+run() {
+	cd ${rawReportsDir}
+
+	# split Goss output into multiple files numbered sequentially.
+	awk '
+	FNR==1 {
+	   path = namex = FILENAME;
+	   sub(/^.*\//,   "", namex);
+	   sub(namex "$", "", path );
+	   name = ext  = namex;
+	   sub(/\.[^.]*$/, "", name);
+	   sub("^" name,   "", ext );
+	}
+	/<\?xml / {
+	   if (out) close(out);
+	   out = path name (++file) ext ;
+	   print "Spliting to " out " ...";
+	}
+	/<\?xml /,/<\/testsuite>/ {
+	   print $0 > out
+	}
+	' ${gossOutputFile}
+
+	# use the highest numbered file as Goss' final junit report
+	highestNum=$(ls -l | grep goss-output | grep -v ${gossOutputFile} | wc -l | sed 's/^[ \t]*//;s/[ \t]*$//')
+	echo "mv goss-output${highestNum}.txt ../reports/goss-junit.xml"
+	mv goss-output${highestNum}.txt ../reports/goss-junit.xml
+}
+
+
+if [ $# -eq 0 ]; then
+    echo "ERROR: Missing arguments" 1>&2
+    usage
+    exit 1
+fi
+
+while [ "$1" != "" ]; do
+    case $1 in
+        -g | --goss-output )
+            shift
+            gossOutputFile=$1
+            ;;
+        -r | --reports )
+            shift
+            reportsDir=$1
+            ;;
+        -w | --raw-reports )
+            shift
+            rawReportsDir=$1
+            ;;
+        * )
+            usageErrorExit "Unknown option '${1}'"
+    esac
+    shift
+done
+
+run
